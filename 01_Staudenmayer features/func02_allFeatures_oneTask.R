@@ -13,6 +13,9 @@ convertTo_militaryTime <- function(timeStr) {
      if(as.numeric(str[1]) < 7) {
           h <- as.character(as.numeric(str[1]) + 12)
      }
+     if(nchar(h) < 2) {
+          h <- paste("0", h, sep = "")
+     }
      paste(h, str[2], str[3], sep = ":")
 }
 
@@ -51,7 +54,7 @@ main <- function(participantCode, taskTimeInfo, wristAccelData, cosmedFileData, 
      return(result)
 }
 
-participant_task_features <- function(participantCode, taskTimeInfo, wristAccelData, cosmedFileData, visualize = TRUE) {
+participant_task_features <- function(participant.metaInfo, taskTimeInfo, wristAccelData, cosmedFileData, visualize = TRUE) {
      startTime <- paste(as.character(taskTimeInfo$Phone.start.time), ".000", sep = "")
      endTime <- paste(as.character(taskTimeInfo$Phone.End.Time), ".000", sep = "")
      
@@ -75,7 +78,10 @@ participant_task_features <- function(participantCode, taskTimeInfo, wristAccelD
      participant_row$MET <- NA
      participant_row$sedentary <- FALSE
      participant_row$locomotion <- FALSE
-     participant_row$participant <- participantCode
+     participant_row$participant <- participant.metaInfo$participantCode
+     participant_row$age <- participant.metaInfo$age
+     participant_row$BMI <- participant.metaInfo$BMI
+     participant_row$gender <- participant.metaInfo$gender
      participant_row$task <- taskTimeInfo$Task
      
      cosmedStartTime <- convertTo_HH_MM_SS(as.character(taskTimeInfo$Cosmed.Start.Time))
