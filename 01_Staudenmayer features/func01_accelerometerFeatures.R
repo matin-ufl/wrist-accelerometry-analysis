@@ -114,19 +114,27 @@ constructFeatures <- function(x, y, z) {
 
 
 CV <- function(x){
-     (sd(x) / mean(x)) * 100
+     a <- (sd(x) / mean(x)) * 100
+     if(is.na(a)) {
+          a <- Inf
+     }
+     a
 }
 
 findTheBestWindow <- function(cosmedData) {
-     WINDOW_DURATION <- 150 #2:30 window
+     WINDOW_DURATION <- 120 #2-min window
+     MIN_WINDOW_THRESHOLD_FOR_TWO_MIN <- 5 * 60 # At least there shold 5 minute to consider a 2 minute window
      
      # Sometimes the task ends so quickly, that 2:30 window is not feasible
-     if(as.numeric(cosmedData$artificialTime[nrow(cosmedData)] - cosmedData$artificialTime[1]) < WINDOW_DURATION) {
+     if(as.numeric(cosmedData$artificialTime[nrow(cosmedData)] - cosmedData$artificialTime[1]) < MIN_WINDOW_THRESHOLD_FOR_TWO_MIN) {
           WINDOW_DURATION <- 60
      }
      
+     offset <- floor(length(cosmedData$VO2.Kg) / 20)
+     cosmedData <- cosmedData[offset:(nrow(cosmedData)-offset), ]
+     
      best.start <- 1
-     best.end <- 2
+     best.end <- best.start + 1
      currIdx <- 1
      endIdx <- currIdx + 1
      best.CV <- Inf

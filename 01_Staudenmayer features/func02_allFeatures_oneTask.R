@@ -4,6 +4,9 @@ convertTo_HH_MM_SS <- function(timeStr) {
      h <- 0; m <- 0; s <- as.numeric(timeStr[2])
      h <- floor(as.numeric(timeStr[1]) / 60)
      m <- as.numeric(timeStr[1]) - (h * 60)
+     h <- as.character(h); while(nchar(h) < 2) {h <- paste("0", h, sep = "")}
+     m <- as.character(m); while(nchar(m) < 2) {m <- paste("0", m, sep = "")}
+     s <- as.character(s); while(nchar(s) < 2) {s <- paste("0", s, sep = "")}
      paste(h, ":", m, ":", s, sep = "")
 }
 
@@ -55,8 +58,12 @@ main <- function(participantCode, taskTimeInfo, wristAccelData, cosmedFileData, 
 }
 
 participant_task_features <- function(participant.metaInfo, taskTimeInfo, wristAccelData, cosmedFileData, visualize = TRUE) {
-     startTime <- paste(as.character(taskTimeInfo$Phone.start.time), ".000", sep = "")
-     endTime <- paste(as.character(taskTimeInfo$Phone.End.Time), ".000", sep = "")
+     temp <- str_trim(taskTimeInfo$Phone.Start.Time, side = "both")
+     temp <- unlist(strsplit(temp, split = " "))[1]
+     startTime <- paste(as.character(temp), ".000", sep = "")
+     temp <- str_trim(taskTimeInfo$Phone.End.Time, side = "both")
+     temp <- unlist(strsplit(temp, split = " "))[1]
+     endTime <- paste(as.character(temp), ".000", sep = "")
      
      #####Accelerometer Analysis####
      wristData <- wristAccelData

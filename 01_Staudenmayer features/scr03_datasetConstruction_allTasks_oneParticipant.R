@@ -1,26 +1,36 @@
 # This script loops over all the tasks defined in 
 
 # Parameter initializations and global data -------------------------------
-setwd("~/Dropbox/Work-Research/Current Directory/Chores/wrist-accelerometry-analysis/")
+setwd("~/Workspaces/R workspace/Wrist Accelerometry Analysis/wrist-accelerometry-analysis/")
 library(utils)
 library(stringr)
 clr <- function(){cat(rep("\n", 50))}
 
-outputFileName <- "../Datasets/Outputs/task_wrist_dataset_021116.csv"
+outputFileName <- "~/Dropbox/Work-Research/Current Directory/Chores/Datasets/Outputs/task_wrist_dataset_022616.csv"
 
 # Only for the first time!
 clr()
 print("Are you sure you want to initialize your output file? This will overwrite the existing file.")
-temp_row = data.frame(mvm = NA, sdvm = NA, p625 = NA, df = NA, fpdf = NA, mangle = NA, sdangle = NA, MET = NA, sedentary = NA, locomotion = NA, participant = NA, task = NA, age = NA, BMI = NA, gender = NA)
-write.table(temp_row, file = outputFileName, append = F, col.names = T, row.names = F, sep = ",")
-rm(temp_row)
+features_rows <- data.frame(matrix(nrow = 0, ncol = 15))
+colnames(features_rows) <- c("mvm", "sdvm", "p625", "df", "fpdf", "mangle", "sdangle", "MET", "sedentary", "locomotion", "participant", "age", "BMI", "gender", "task")
+write.table(features_rows, file = outputFileName, append = F, col.names = T, row.names = F, sep = ",")
 
 # Reading meta information
-meta.df <- read.csv("../Datasets/Participants Meta Info/under45_metaInfo.csv")
+# >>>> Participants Meta Info / Chores_Participants.csv
+meta.df <- read.csv(file.choose())
+ordered.idx <- with(meta.df, order(meta.df$Age, decreasing = F))
+meta.df <- meta.df[ordered.idx, ]
+rm(ordered.idx)
 
 
+
+#
+#
+# START FROM HERE FOR EVERY PARTICIPANT
+#
+#
 # Temporary - For easier file selection
-setwd("~/../../Volumes/FILES/AGING/SHARE/ARRC/Active_Studies/CHORES-XL_087-2013/Participant Data/Matin01_Under 45/")
+setwd("~/../../Volumes/aging/SHARE/ARRC/Active_Studies/CHORES-XL_087-2013/Participant Data/ERPU08907282015/")
 
 
 # Selecting Raw Data Files ----------------------------------------------
@@ -37,7 +47,7 @@ participantCode <- strtrim(participantCode[2], width = 7)
 clr()
 print("Check [info.table]. If necessary remove the first row.")
 
-colnames(info.table) <- c("Task", "Cosmed.Start.Time", "Cosmed.End.Time", "Phone.start.time", "Phone.End.Time", "Visit.Date")
+colnames(info.table) <- c("Task", "Cosmed.Start.Time", "Cosmed.End.Time", "Phone.Start.Time", "Phone.End.Time", "Visit.Date")
 # info.table <- info.table[-1, ]
 
 rm(fileName)
@@ -94,14 +104,16 @@ cosmedData.v4 <- read.csv(fileName, colClasses = c(rep("NULL", 9), NA, rep("NULL
 
 
 # Feature Construction: For all the tasks -------------------------------
-setwd("~/Dropbox/Work-Research/Current Directory/Chores/wrist-accelerometry-analysis/")
+setwd("~/Workspaces/R workspace/Wrist Accelerometry Analysis/wrist-accelerometry-analysis/")
 source("01_Staudenmayer features/func01_accelerometerFeatures.R")
 source("01_Staudenmayer features/func02_allFeatures_oneTask.R")
 
-for(t in 1:nrow(info.table)) {
+features_rows <- data.frame(matrix(nrow = 0, ncol = 15))
+colnames(features_rows) <- c("mvm", "sdvm", "p625", "df", "fpdf", "mangle", "sdangle", "MET", "sedentary", "locomotion", "participant", "age", "BMI", "gender", "task")
+for(t in 30:nrow(info.table)) {
      if(!is.na(info.table$Cosmed.Start.Time[t]) &&
         !is.na(info.table$Cosmed.End.Time[t]) &&
-        !is.na(info.table$Phone.start.time[t]) &&
+        !is.na(info.table$Phone.Start.Time[t]) &&
         !is.na(info.table$Phone.End.Time[t]) &&
         !is.na(info.table$Visit.Date[t])) {
           taskTimeInfo <- info.table[t, ]
@@ -110,31 +122,31 @@ for(t in 1:nrow(info.table)) {
                features_row <- main(participant.metaInfo, taskTimeInfo, wristData.v1, cosmedData.v1, visualize = TRUE)
                # Writing into a file
                if(length(which(is.na(features_row))) < 1) {
-                    write.table(features_row, file = outputFileName, append = T, col.names = F, row.names = F, sep = ",")
+                    features_rows <- rbind(features_rows, features_row)
                }
           } else if(visit == "V2") {
                features_row <- main(participant.metaInfo, taskTimeInfo, wristData.v2, cosmedData.v2, visualize = TRUE)
                # Writing into a file
                if(length(which(is.na(features_row))) < 1) {
-                    write.table(features_row, file = outputFileName, append = T, col.names = F, row.names = F, sep = ",")
+                    features_rows <- rbind(features_rows, features_row)
                }
           } else if(visit == "V3") {
                features_row <- main(participant.metaInfo, taskTimeInfo, wristData.v3, cosmedData.v3, visualize = TRUE)
                # Writing into a file
                if(length(which(is.na(features_row))) < 1) {
-                    write.table(features_row, file = outputFileName, append = T, col.names = F, row.names = F, sep = ",")
+                    features_rows <- rbind(features_rows, features_row)
                }
           } else if(visit == "V4") {
                features_row <- main(participant.metaInfo, taskTimeInfo, wristData.v4, cosmedData.v4, visualize = TRUE)
                # Writing into a file
                if(length(which(is.na(features_row))) < 1) {
-                    write.table(features_row, file = outputFileName, append = T, col.names = F, row.names = F, sep = ",")
+                    features_rows <- rbind(features_rows, features_row)
                }
           } else {
                print(paste("Unknown visit for ", taskTimeInfo$Task, ": ", taskTimeInfo$Visit.Date, sep = ""))
           }
      }
 }
-
+write.table(features_rows, file = outputFileName, append = T, col.names = F, row.names = F, sep = ",")
 
 rm(list = ls())
