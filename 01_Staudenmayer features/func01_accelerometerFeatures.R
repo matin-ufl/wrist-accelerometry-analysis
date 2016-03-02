@@ -123,7 +123,7 @@ CV <- function(x){
 
 findTheBestWindow <- function(cosmedData) {
      WINDOW_DURATION <- 120 #2-min window
-     MIN_WINDOW_THRESHOLD_FOR_TWO_MIN <- 5 * 60 # At least there shold 5 minute to consider a 2 minute window
+     MIN_WINDOW_THRESHOLD_FOR_TWO_MIN <- 5 # At least there shold 5 minute to consider a 2 minute window
      
      # Sometimes the task ends so quickly, that 2:30 window is not feasible
      if(as.numeric(cosmedData$artificialTime[nrow(cosmedData)] - cosmedData$artificialTime[1]) < MIN_WINDOW_THRESHOLD_FOR_TWO_MIN) {
@@ -155,5 +155,6 @@ findTheBestWindow <- function(cosmedData) {
           currIdx <- currIdx + 1
           endIdx <- currIdx + 1
      }
+     best.start <- best.start + offset; best.end <- best.end + offset
      data.frame(best.start, best.end)
 }

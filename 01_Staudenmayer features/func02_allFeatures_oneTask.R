@@ -91,16 +91,8 @@ participant_task_features <- function(participant.metaInfo, taskTimeInfo, wristA
      participant_row$gender <- participant.metaInfo$gender
      participant_row$task <- taskTimeInfo$Task
      
-     cosmedStartTime <- convertTo_HH_MM_SS(as.character(taskTimeInfo$Cosmed.Start.Time))
-     cosmedEndTime <- convertTo_HH_MM_SS(as.character(taskTimeInfo$Cosmed.End.Time))
-     
-     cosmedData <- cosmedFileData
-     cosmedData$artificialTime <- strptime(as.character(cosmedData$t), "%T")
-     cosmedStartIdx <- min(which(cosmedData$artificialTime > strptime(cosmedStartTime, "%T")))
-     cosmedEndIdx <- min(which(cosmedData$artificialTime > strptime(cosmedEndTime, "%T")))
-     cosmedData <- cosmedData[cosmedStartIdx:cosmedEndIdx, ]
-     cosmedData$VO2.Kg <- as.numeric(as.character(cosmedData$VO2.Kg))
-     cosmedData$t <- as.character(cosmedData$t)
+     # giveRightCosmedData(cosmedFileData, cosmedStartTime, cosmedEndTime)
+     cosmedData <- giveRightCosmedData(cosmedFileData, taskTimeInfo$Cosmed.Start.Time, taskTimeInfo$Cosmed.End.Time)
      
      res <- findTheBestWindow(cosmedData)
      participant_row$MET <- (mean(cosmedData$VO2.Kg[res$best.start:res$best.end]) / 3.5)
@@ -137,4 +129,43 @@ participant_task_features <- function(participant.metaInfo, taskTimeInfo, wristA
           grid.arrange(g_accel, g_freq, g_cosmed, ncol = 1)
      }
      participant_row
+}
+
+# takes
+# 1. all cosmed data (for a specific visit)
+# 2. task start time (cosmed.start - as written in task times)
+# 3. task end time (cosmed.end - as written in task times)
+# and returns the right part of the data from all stored information in cosmed file. No further processing is made.
+giveRightCosmedData <- function(cosmedFileData, cosmedStartTime_raw, cosmedEndTime_raw) {
+     cosmedStartTime <- convertTo_HH_MM_SS(as.character(cosmedStartTime_raw))
+     cosmedEndTime <- convertTo_HH_MM_SS(as.character(cosmedEndTime_raw))
+     cosmedData <- cosmedFileData
+     cosmedData$artificialTime <- strptime(as.character(cosmedData$t), "%T")
+     cosmedStartIdx <- min(which(cosmedData$artificialTime >= strptime(cosmedStartTime, "%T")))
+     cosmedEndIdx <- min(which(cosmedData$artificialTime >= strptime(cosmedEndTime, "%T")))
+     if((cosmedStartIdx != Inf) && (cosmedEndIdx == Inf)) {
+          cosmedEndIdx <- nrow(cosmedData)
+     }
+     cosmedData <- cosmedData[cosmedStartIdx:cosmedEndIdx, ]
+     cosmedData$VO2.Kg <- as.numeric(as.character(cosmedData$VO2.Kg))
+     cosmedData$t <- as.character(cosmedData$t)
+     cosmedData
+}
+
+# taks: cosmed data, given for a specific task. It should be the output of giveRightCosmedData function.
+# calculates: the features which can be constructed from cosmed data - for now it is just MET
+giveCosmedFeatures <- function(taskCosmedData, visualize = F, plot.title = "COSMED") {
+     res <- findTheBestWindow(taskCosmedData)
+     MET <- (mean(taskCosmedData$VO2.Kg[res$best.start:res$best.end]) / 3.5)
+     taskCosmedData$code <- 1
+     taskCosmedData$code[res$best.start:res$best.end] <- 2
+     taskCosmedData$code <- as.factor(taskCosmedData$code)
+     if(visualize) {
+          g_cosmed <- ggplot(data = taskCosmedData) + theme_grey()
+          g_cosmed <- g_cosmed + geom_line(aes(size = code, x = seq_along(VO2.Kg), y = round(VO2.Kg, digits = 2), color = code, group = "A"))
+          g_cosmed <- g_cosmed + scale_x_continuous(breaks = seq(1, length(taskCosmedData$VO2.Kg), 10), labels = taskCosmedData$t[seq(1, length(taskCosmedData$VO2.Kg), 10)])
+          g_cosmed <- g_cosmed + scale_color_manual(values=c("red", "blue"), labels = c("VO2", "Plateau")) + labs(x = "Time", y = "VO2.Kg", title = plot.title)
+          print(g_cosmed)
+     }
+     result <- data.frame(MET = MET)
 }
