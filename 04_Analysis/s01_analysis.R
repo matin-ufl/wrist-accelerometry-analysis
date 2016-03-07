@@ -250,7 +250,7 @@ qda.results <- data.frame(matrix(nrow = 0, ncol = 3))
 colnames(qda.results) <- c("Accuracy", "Recall.Sedentary", "Recal.Nonsedentary")
 for(i in 1:5) {
      test.idx <- cv.points[i]:cv.points[i+1]
-     qda.fit <- lda(class.sedentary ~ ., data = classification.df[-test.idx, ])
+     qda.fit <- qda(class.sedentary ~ ., data = classification.df[-test.idx, ])
      
      # Prediction on test set
      predicted <- as.character(predict(qda.fit, classification.df[test.idx, -1])$class)
@@ -377,4 +377,418 @@ rm(g_acc, g_sed, g_nonsed)
 
 
 # Classification - Locomotion ==========================================================
-Do this just like sedentary (do not worry. it will pay off some day)
+setwd("~/Workspaces/R workspace/Wrist Accelerometry Analysis/wrist-accelerometry-analysis/")
+load("~/Dropbox/Work-Research/Current Directory/Chores/Datasets/V1 Under 50/d03_dataset_u50.RData")
+library(ggplot2)
+library(reshape2)
+
+# Parallel Coordinate Plot - class.locomotion ==========================================
+plot.df <- chores.u50[, c(7, 10:16)]
+c <- colnames(plot.df)
+plot.df <- data.frame(plot.df$class.locomotion, scale(plot.df[, 2:ncol(plot.df)]))
+colnames(plot.df) <- c
+rm(c)
+plot.df <- melt(plot.df)
+plot.df$id <- as.factor(rep((1:nrow(chores.u50)), 7))
+
+g <- ggplot(data = plot.df) + geom_line(aes(x = variable, y = value, group = id, color = class.locomotion))
+g + theme_bw() + scale_color_manual(values = c("red", "blue"))
+
+rm(g, plot.df)
+
+
+# Feature table for different classes - Locomotion =====================================
+locomotion.idx <- which(chores.u50$class.locomotion)
+feature.table <- data.frame(matrix(nrow = 0, ncol = 6))
+colnames(feature.table) <- c("Feature", "Locomotion.Avg", "Locomotion.SD", "Nonlocomotion.Avg", "Nonlocomotion.SD", "P.Value")
+for(i in 10:16) {
+     curr.row <- data.frame(Feature = colnames(chores.u50)[i],
+                            Locomotion.Avg = NA, Locomotion.SD = NA, Nonlocomotion.Avg = NA, Nonlocomotion.SD = NA, P.Value = NA)
+     test <- t.test(chores.u50[locomotion.idx, i], chores.u50[-locomotion.idx, i], var.equal = T)
+     curr.row$Locomotion.Avg <- round(mean(chores.u50[locomotion.idx, i]), digits = 2)
+     curr.row$Locomotion.SD <- round(sd(chores.u50[locomotion.idx, i]), digits = 2)
+     curr.row$Nonlocomotion.Avg <- round(mean(chores.u50[-locomotion.idx, i]), digits = 2)
+     curr.row$Nonlocomotion.SD <- round(sd(chores.u50[-locomotion.idx, i]), digits = 2)
+     curr.row$P.Value <- round(test$p.value, digits = 3)
+     feature.table <- rbind(feature.table, curr.row)
+}
+rm(i, curr.row, test, locomotion.idx)
+write.csv("~/Dropbox/Work-Research/Current Directory/Chores/Documents/022916/table5_locomotion_features.csv", row.names = F)
+rm(feature.table)
+
+
+# two-D scatter plot - Locomotion ======================================================
+plot.df <- chores.u50[, c(7, 14, 12)]
+g <- ggplot(data = plot.df) + geom_point(aes(x = fpdf, y = p625, colour = class.locomotion, size = class.locomotion))
+g + theme_bw() + scale_colour_manual(values = c("red", "blue")) + scale_size_manual(values = c(2, 3), guide = F)
+rm(g, plot.df)
+
+
+# Classification - Locomotion =====================================================================================
+set.seed(5855)
+random.idx <- sample(x = nrow(chores.u50), size = nrow(chores.u50))
+classification.df <- chores.u50[random.idx, c(7, 10:16)]
+rm(random.idx)
+cv.points <- seq(1, nrow(chores.u50), by = floor(nrow(chores.u50)/5))
+
+classification.results <- data.frame(matrix(nrow = 0, ncol = 4))
+colnames(classification.results) <- c("Method", "Accuracy", "Recall.Locomotion", "Recall.Nonlocomotion")
+
+# LDA - Locomotion ################################
+library(MASS)
+lda.results <- data.frame(matrix(nrow = 0, ncol = 3))
+colnames(lda.results) <- c("Accuracy", "Recall.Locomotion", "Recal.Nonlocomotion")
+for(i in 1:5) {
+     test.idx <- cv.points[i]:cv.points[i+1]
+     lda.fit <- lda(class.locomotion ~ ., data = classification.df[-test.idx, ])
+     
+     # Prediction on test set
+     predicted <- as.character(predict(lda.fit, classification.df[test.idx, -1])$class)
+     tbl <- table(classification.df$class.locomotion[test.idx], predicted)
+     temp.row <- data.frame(Accuracy = round((tbl[1, 1] + tbl[2, 2]) * 100 / sum(tbl), digits = 2),
+                            Recall.Locomotion = round((tbl[2, 2] * 100) / sum(tbl[2, ]), digits = 2),
+                            Recall.Nonlocomotion = round((tbl[1, 1] * 100) / sum(tbl[1, ]), digits = 2))
+     lda.results <- rbind(lda.results, temp.row)
+}
+rm(i, test.idx, tbl, predicted, temp.row, lda.fit)
+
+temp.row <- data.frame(Method = "LDA",
+                       Accuracy = round(mean(lda.results$Accuracy), digits = 2),
+                       Recall.Locomotion = round(mean(lda.results$Recall.Locomotion), digits = 2),
+                       Recall.Nonlocomotion = round(mean(lda.results$Recall.Nonlocomotion), digits = 2))
+classification.results <- rbind(classification.results, temp.row)
+rm(temp.row, lda.results)
+
+# QDA - Locomotion ################################
+library(MASS)
+qda.results <- data.frame(matrix(nrow = 0, ncol = 3))
+colnames(qda.results) <- c("Accuracy", "Recall.Locomotion", "Recall.Nonlocomotion")
+for(i in 1:5) {
+     test.idx <- cv.points[i]:cv.points[i+1]
+     qda.fit <- qda(class.locomotion ~ ., data = classification.df[-test.idx, ])
+     
+     # Prediction on test set
+     predicted <- as.character(predict(qda.fit, classification.df[test.idx, -1])$class)
+     tbl <- table(classification.df$class.locomotion[test.idx], predicted)
+     temp.row <- data.frame(Accuracy = round((tbl[1, 1] + tbl[2, 2]) * 100 / sum(tbl), digits = 2),
+                            Recall.Locomotion = round((tbl[2, 2] * 100) / sum(tbl[2, ]), digits = 2),
+                            Recall.Nonlocomotion = round((tbl[1, 1] * 100) / sum(tbl[1, ]), digits = 2))
+     qda.results <- rbind(qda.results, temp.row)
+}
+rm(i, test.idx, tbl, predicted, temp.row, qda.fit)
+
+temp.row <- data.frame(Method = "QDA",
+                       Accuracy = round(mean(qda.results$Accuracy), digits = 2),
+                       Recall.Locomotion = round(mean(qda.results$Recall.Locomotion), digits = 2),
+                       Recall.Nonlocomotion = round(mean(qda.results$Recall.Nonlocomotion), digits = 2))
+classification.results <- rbind(classification.results, temp.row)
+rm(temp.row, qda.results)
+
+# kNN - Locomotion ####################################
+library(class)
+knn.df <- data.frame(class.sedentary = classification.df$class.locomotion, scale(classification.df[, -1]))
+knn.results <- data.frame(matrix(nrow = 0, ncol = 3))
+colnames(knn.results) <- c("Accuracy", "Recall.Locomotion", "Recall.Nonlocomotion")
+neighbors <- 10
+for(i in 1:5) {
+     test.idx <- cv.points[i]:cv.points[i+1]
+     
+     # Prediction on test set
+     predicted <- as.character(knn(train = knn.df[-test.idx, -1], test = knn.df[test.idx, -1], cl = knn.df[-test.idx, 1], k = neighbors))
+     tbl <- table(classification.df$class.locomotion[test.idx], predicted)
+     temp.row <- data.frame(Accuracy = round((tbl[1, 1] + tbl[2, 2]) * 100 / sum(tbl), digits = 2),
+                            Recall.Locomotion = round((tbl[2, 2] * 100) / sum(tbl[2, ]), digits = 2),
+                            Recall.Nonlocomotion = round((tbl[1, 1] * 100) / sum(tbl[1, ]), digits = 2))
+     knn.results <- rbind(knn.results, temp.row)
+}
+rm(i, test.idx, tbl, predicted, temp.row)
+
+temp.row <- data.frame(Method = paste("kNN", as.character(neighbors), sep = "-"),
+                       Accuracy = round(mean(knn.results$Accuracy), digits = 2),
+                       Recall.Locomotion = round(mean(knn.results$Recall.Locomotion), digits = 2),
+                       Recall.Nonlocomotion = round(mean(knn.results$Recall.Nonlocomotion), digits = 2))
+classification.results <- rbind(classification.results, temp.row)
+rm(temp.row, knn.results, knn.df, neighbors)
+
+
+# Decision Tree - Locomotion ################################
+classification.df$class.locomotion<- as.factor(classification.df$class.locomotion)
+library(rpart)
+dt.results <- data.frame(matrix(nrow = 0, ncol = 3))
+colnames(dt.results) <- c("Accuracy", "Recall.Locomotion", "Recal.Nonlocomotion")
+minSplit <- 10
+tree.control <- rpart.control(minsplit = minSplit, minbucket = 3, xval = 0)
+
+for(i in 1:5) {
+     test.idx <- cv.points[i]:cv.points[i+1]
+     dt.fit <- rpart(formula = class.locomotion~., data = classification.df[-test.idx, ], control = tree.control)
+     
+     # Prediction on test set
+     predicted <- as.character(predict(dt.fit, classification.df[test.idx, -1], type = "class"))
+     tbl <- table(classification.df$class.locomotion[test.idx], predicted)
+     temp.row <- data.frame(Accuracy = round((tbl[1, 1] + tbl[2, 2]) * 100 / sum(tbl), digits = 2),
+                            Recall.Locomotion = round((tbl[2, 2] * 100) / sum(tbl[2, ]), digits = 2),
+                            Recall.Nonlocomotion = round((tbl[1, 1] * 100) / sum(tbl[1, ]), digits = 2))
+     dt.results <- rbind(dt.results, temp.row)
+}
+rm(i, test.idx, tbl, predicted, temp.row, tree.control)
+
+temp.row <- data.frame(Method = paste("DecisionTree", minSplit, sep = "-"),
+                       Accuracy = round(mean(dt.results$Accuracy), digits = 2),
+                       Recall.Locomotion = round(mean(dt.results$Recall.Locomotion), digits = 2),
+                       Recall.Nonlocomotion = round(mean(dt.results$Recall.Nonlocomotion), digits = 2))
+classification.results <- rbind(classification.results, temp.row)
+rm(temp.row, dt.results, minSplit)
+
+# Plotting decision tree
+tree.control <- rpart.control(minsplit = 5, minbucket = 3, xval = 0)
+dt.fit <- rpart(formula = class.locomotion~., classification.df, control = tree.control)
+plot(dt.fit, compress = T, margin = 0.2, uniform = T, nspace = 11)
+text(dt.fit, use.n = T)
+rm(tree.control, dt.fit)
+
+
+# Random Forest - Locomotion ################################
+library(randomForest)
+library(gridExtra)
+set.seed(5855)
+rf.fit <- randomForest(class.locomotion~., data = classification.df, ntree = 100000, mtry = 2, importance = T)
+print(rf.fit)
+temp.row <- data.frame(Method = "Random Forest-2",
+                       Accuracy = round((rf.fit$confusion[1, 1] + rf.fit$confusion[2, 2]) * 100 / (sum(rf.fit$confusion[, 1]) + sum(rf.fit$confusion[, 2])), digits = 2),
+                       Recall.Locomotion = round((100 - (rf.fit$confusion[2, 3] * 100)), digits = 2),
+                       Recall.Nonlocomotion = round((100 - (rf.fit$confusion[1, 3] * 100)), digits = 2))
+classification.results <- rbind(classification.results, temp.row)
+varImpPlot(rf.fit)
+rm(temp.row, rf.fit)
+
+set.seed(5855)
+rf.fit <- randomForest(class.locomotion~., data = classification.df, ntree = 100000, mtry = 3, importance = T)
+print(rf.fit)
+temp.row <- data.frame(Method = "Random Forest-3",
+                       Accuracy = round((rf.fit$confusion[1, 1] + rf.fit$confusion[2, 2]) * 100 / (sum(rf.fit$confusion[, 1]) + sum(rf.fit$confusion[, 2])), digits = 2),
+                       Recall.Locomotion = round((100 - (rf.fit$confusion[2, 3] * 100)), digits = 2),
+                       Recall.Nonlocomotion = round((100 - (rf.fit$confusion[1, 3] * 100)), digits = 2))
+classification.results <- rbind(classification.results, temp.row)
+rm(temp.row, rf.fit)
+
+
+write.csv(classification.results, file = "~/Dropbox/Work-Research/Current Directory/Chores/Documents/022916/table6-classification-locomotion.csv", row.names = F)
+
+
+
+
+# Classification - Activity Level ==========================================================
+setwd("~/Workspaces/R workspace/Wrist Accelerometry Analysis/wrist-accelerometry-analysis/")
+load("~/Dropbox/Work-Research/Current Directory/Chores/Datasets/V1 Under 50/d03_dataset_u50.RData")
+library(ggplot2)
+library(reshape2)
+
+# Parallel Coordinate Plot - class.activityLevel ==========================================
+plot.df <- chores.u50[, c(8, 10:16)]
+c <- colnames(plot.df)
+plot.df <- data.frame(plot.df$class.activityLevel, scale(plot.df[, 2:ncol(plot.df)]))
+colnames(plot.df) <- c
+rm(c)
+plot.df <- melt(plot.df)
+plot.df$id <- as.factor(rep((1:nrow(chores.u50)), 7))
+
+g <- ggplot(data = plot.df) + geom_line(aes(x = variable, y = value, group = id, color = class.activityLevel, size = class.activityLevel))
+g + theme_bw() + scale_color_manual(values = c("red", "blue", "green")) + scale_size_manual(values = c(1, 1, 2), guide = F)
+
+rm(g, plot.df)
+
+
+# Feature table for different classes - activity level =====================================
+light.idx <- which(chores.u50$class.activityLevel == "L")
+moderate.idx <- which(chores.u50$class.activityLevel == "M")
+vigorous.idx <- which(chores.u50$class.activityLevel == "V")
+feature.table <- data.frame(matrix(nrow = 0, ncol = 8))
+colnames(feature.table) <- c("Feature", "Light.Avg", "Light.SD", "Moderate.Avg", "Moderate.SD", "Vigorous.Avg", "Vigorous.SD", "P.Value")
+for(i in 10:16) {
+     curr.row <- data.frame(Feature = colnames(chores.u50)[i],
+                            Light.Avg = NA, Light.SD = NA, Moderate.Avg = NA, Moderate.SD = NA, Vigorous.Avg = NA, Vigorous.SD = NA, P.Value = NA)
+     mdl <- lm(chores.u50[, i] ~ class.activityLevel, data = classification.df)
+     test <- anova(mdl)
+     curr.row$Light.Avg <- round(mean(chores.u50[light.idx, i]), digits = 2)
+     curr.row$Light.SD <- round(sd(chores.u50[light.idx, i]), digits = 2)
+     curr.row$Moderate.Avg <- round(mean(chores.u50[moderate.idx, i]), digits = 2)
+     curr.row$Moderate.SD <- round(sd(chores.u50[moderate.idx, i]), digits = 2)
+     curr.row$Vigorous.Avg <- round(mean(chores.u50[vigorous.idx, i]), digits = 2)
+     curr.row$Vigorous.SD <- round(sd(chores.u50[vigorous.idx, i]), digits = 2)
+     curr.row$P.Value <- round(test$`Pr(>F)`[1], digits = 3)
+     feature.table <- rbind(feature.table, curr.row)
+}
+rm(i, curr.row, test, mdl, light.idx, moderate.idx, vigorous.idx)
+write.csv("~/Dropbox/Work-Research/Current Directory/Chores/Documents/022916/table8_activityLevel_features.csv", row.names = F)
+rm(feature.table)
+
+
+# two-D scatter plot - Activity Level ======================================================
+plot.df <- chores.u50[, c(8, 14, 12)]
+g <- ggplot(data = plot.df) + geom_point(aes(x = fpdf, y = p625, colour = class.activityLevel, size = class.activityLevel))
+g + theme_bw() + scale_colour_manual(values = c("red", "blue", "green")) + scale_size_manual(values = c(2, 2, 3), guide = F)
+rm(g, plot.df)
+
+
+# Classification - Activity Level =====================================================================================
+set.seed(5855)
+random.idx <- sample(x = nrow(chores.u50), size = nrow(chores.u50))
+classification.df <- chores.u50[random.idx, c(8, 10:16)]
+rm(random.idx)
+cv.points <- seq(1, nrow(chores.u50), by = floor(nrow(chores.u50)/5))
+
+classification.results <- data.frame(matrix(nrow = 0, ncol = 5))
+colnames(classification.results) <- c("Method", "Accuracy", "Recall.Light", "Recall.Moderate", "Recall.Vigorous")
+
+# LDA - Locomotion ################################
+library(MASS)
+lda.results <- data.frame(matrix(nrow = 0, ncol = 4))
+colnames(lda.results) <- c("Accuracy", "Recall.Light", "Recal.Moderate", "Recall.Vigorous")
+for(i in 1:5) {
+     test.idx <- cv.points[i]:cv.points[i+1]
+     lda.fit <- lda(class.activityLevel ~ ., data = classification.df[-test.idx, ])
+     
+     # Prediction on test set
+     predicted <- predict(lda.fit, classification.df[test.idx, -1])$class
+     tbl <- table(classification.df$class.activityLevel[test.idx], predicted)
+     temp.row <- data.frame(Accuracy = round((tbl[1, 1] + tbl[2, 2] + tbl[3, 3]) * 100 / sum(tbl), digits = 2),
+                            Recall.Light = round((tbl[1, 1] * 100) / sum(tbl[1, ]), digits = 2),
+                            Recall.Moderate = round((tbl[2, 2] * 100) / sum(tbl[2, ]), digits = 2),
+                            Recall.Vigorous = round((tbl[3, 3] * 100) / sum(tbl[3, ]), digits = 2))
+     lda.results <- rbind(lda.results, temp.row)
+}
+rm(i, test.idx, tbl, predicted, temp.row, lda.fit)
+
+temp.row <- data.frame(Method = "LDA",
+                       Accuracy = round(mean(lda.results$Accuracy), digits = 2),
+                       Recall.Light = round(mean(lda.results$Recall.Light), digits = 2),
+                       Recall.Moderate = round(mean(lda.results$Recall.Moderate), digits = 2),
+                       Recall.Vigorous = round(mean(lda.results$Recall.Vigorous), digits = 2))
+classification.results <- rbind(classification.results, temp.row)
+rm(temp.row, lda.results)
+
+# QDA - Locomotion ################################
+library(MASS)
+qda.results <- data.frame(matrix(nrow = 0, ncol = 4))
+colnames(qda.results) <- c("Accuracy", "Recall.Light", "Recal.Moderate", "Recall.Vigorous")
+for(i in 1:5) {
+     test.idx <- cv.points[i]:cv.points[i+1]
+     qda.fit <- qda(class.activityLevel ~ ., data = classification.df[-test.idx, ])
+     
+     # Prediction on test set
+     predicted <- as.character(predict(qda.fit, classification.df[test.idx, -1])$class)
+     tbl <- table(classification.df$class.activityLevel[test.idx], predicted)
+     temp.row <- data.frame(Accuracy = round((tbl[1, 1] + tbl[2, 2] + tbl[3, 3]) * 100 / sum(tbl), digits = 2),
+                            Recall.Light = round((tbl[1, 1] * 100) / sum(tbl[1, ]), digits = 2),
+                            Recall.Moderate = round((tbl[2, 2] * 100) / sum(tbl[2, ]), digits = 2),
+                            Recall.Vigorous = round((tbl[3, 3] * 100) / sum(tbl[3, ]), digits = 2))
+     qda.results <- rbind(qda.results, temp.row)
+}
+rm(i, test.idx, tbl, predicted, temp.row, qda.fit)
+
+temp.row <- data.frame(Method = "QDA",
+                       Accuracy = round(mean(qda.results$Accuracy), digits = 2),
+                       Recall.Light = round(mean(qda.results$Recall.Light), digits = 2),
+                       Recall.Moderate = round(mean(qda.results$Recall.Moderate), digits = 2),
+                       Recall.Vigorous = round(mean(qda.results$Recall.Vigorous), digits = 2))
+classification.results <- rbind(classification.results, temp.row)
+rm(temp.row, qda.results)
+
+# kNN - Locomotion ####################################
+library(class)
+knn.df <- data.frame(class.activityLevel = classification.df$class.activityLevel, scale(classification.df[, -1]))
+knn.results <- data.frame(matrix(nrow = 0, ncol = 4))
+colnames(knn.results) <- c("Accuracy", "Recall.Light", "Recal.Moderate", "Recall.Vigorous")
+neighbors <- 10
+for(i in 1:5) {
+     test.idx <- cv.points[i]:cv.points[i+1]
+     
+     # Prediction on test set
+     predicted <- knn(train = knn.df[-test.idx, -1], test = knn.df[test.idx, -1], cl = knn.df[-test.idx, 1], k = neighbors)
+     tbl <- table(classification.df$class.activityLevel[test.idx], predicted)
+     temp.row <- data.frame(Accuracy = round((tbl[1, 1] + tbl[2, 2] + tbl[3, 3]) * 100 / sum(tbl), digits = 2),
+                            Recall.Light = round((tbl[1, 1] * 100) / sum(tbl[1, ]), digits = 2),
+                            Recall.Moderate = round((tbl[2, 2] * 100) / sum(tbl[2, ]), digits = 2),
+                            Recall.Vigorous = round((tbl[3, 3] * 100) / sum(tbl[3, ]), digits = 2))
+     knn.results <- rbind(knn.results, temp.row)
+}
+rm(i, test.idx, tbl, predicted, temp.row)
+
+temp.row <- data.frame(Method = paste("kNN", as.character(neighbors), sep = "-"),
+                       Accuracy = round(mean(knn.results$Accuracy), digits = 2),
+                       Recall.Light = round(mean(knn.results$Recall.Light), digits = 2),
+                       Recall.Moderate = round(mean(knn.results$Recall.Moderate), digits = 2),
+                       Recall.Vigorous = round(mean(knn.results$Recall.Vigorous), digits = 2))
+classification.results <- rbind(classification.results, temp.row)
+rm(temp.row, knn.results, knn.df, neighbors)
+
+
+# Decision Tree - Locomotion ################################
+classification.df$class.activityLevel <- as.factor(classification.df$class.activityLevel)
+library(rpart)
+dt.results <- data.frame(matrix(nrow = 0, ncol = 4))
+colnames(dt.results) <- c("Accuracy", "Recall.Light", "Recal.Moderate", "Recall.Vigorous")
+minSplit <- 10
+tree.control <- rpart.control(minsplit = minSplit, minbucket = 3, xval = 0)
+
+for(i in 1:5) {
+     test.idx <- cv.points[i]:cv.points[i+1]
+     dt.fit <- rpart(formula = class.activityLevel~., data = classification.df[-test.idx, ], control = tree.control)
+     
+     # Prediction on test set
+     predicted <- predict(dt.fit, classification.df[test.idx, -1], type = "class")
+     tbl <- table(classification.df$class.activityLevel[test.idx], predicted)
+     temp.row <- data.frame(Accuracy = round((tbl[1, 1] + tbl[2, 2] + tbl[3, 3]) * 100 / sum(tbl), digits = 2),
+                            Recall.Light = round((tbl[1, 1] * 100) / sum(tbl[1, ]), digits = 2),
+                            Recall.Moderate = round((tbl[2, 2] * 100) / sum(tbl[2, ]), digits = 2),
+                            Recall.Vigorous = round((tbl[3, 3] * 100) / sum(tbl[3, ]), digits = 2))
+     dt.results <- rbind(dt.results, temp.row)
+}
+rm(i, test.idx, tbl, predicted, temp.row, tree.control)
+
+temp.row <- data.frame(Method = paste("DecisionTree", minSplit, sep = "-"),
+                       Accuracy = round(mean(dt.results$Accuracy), digits = 2),
+                       Recall.Light = round(mean(dt.results$Recall.Light), digits = 2),
+                       Recall.Moderate = round(mean(dt.results$Recall.Moderate), digits = 2),
+                       Recall.Vigorous = round(mean(dt.results$Recall.Vigorous), digits = 2))
+classification.results <- rbind(classification.results, temp.row)
+rm(temp.row, dt.results, minSplit)
+
+# Plotting decision tree
+tree.control <- rpart.control(minsplit = 5, minbucket = 3, xval = 0)
+dt.fit <- rpart(formula = class.activityLevel~., classification.df, control = tree.control)
+plot(dt.fit, compress = T, margin = 0.2, uniform = T, nspace = 11)
+text(dt.fit, use.n = T)
+rm(tree.control, dt.fit)
+
+
+# Random Forest - Locomotion ################################
+library(randomForest)
+library(gridExtra)
+set.seed(5855)
+rf.fit <- randomForest(class.activityLevel~., data = classification.df, ntree = 100000, mtry = 2, importance = T)
+print(rf.fit)
+temp.row <- data.frame(Method = "Random Forest-2",
+                       Accuracy = round((rf.fit$confusion[1, 1] + rf.fit$confusion[2, 2] + rf.fit$confusion[3, 3]) * 100 / (sum(rf.fit$confusion[, 1]) + sum(rf.fit$confusion[, 2] + sum(rf.fit$confusion[, 3]))), digits = 2),
+                       Recall.Light = round((100 - (rf.fit$confusion[1, 4] * 100)), digits = 2),
+                       Recall.Moderate = round((100 - (rf.fit$confusion[2, 4] * 100)), digits = 2),
+                       Recall.Vigorous = round((100 - (rf.fit$confusion[3, 4] * 100)), digits = 2))
+classification.results <- rbind(classification.results, temp.row)
+varImpPlot(rf.fit)
+rm(temp.row, rf.fit)
+
+set.seed(5855)
+rf.fit <- randomForest(class.activityLevel~., data = classification.df, ntree = 100000, mtry = 3, importance = T)
+print(rf.fit)
+temp.row <- data.frame(Method = "Random Forest-3",
+                       Accuracy = round((rf.fit$confusion[1, 1] + rf.fit$confusion[2, 2] + rf.fit$confusion[3, 3]) * 100 / (sum(rf.fit$confusion[, 1]) + sum(rf.fit$confusion[, 2] + sum(rf.fit$confusion[, 3]))), digits = 2),
+                       Recall.Light = round((100 - (rf.fit$confusion[1, 4] * 100)), digits = 2),
+                       Recall.Moderate = round((100 - (rf.fit$confusion[2, 4] * 100)), digits = 2),
+                       Recall.Vigorous = round((100 - (rf.fit$confusion[3, 4] * 100)), digits = 2))
+classification.results <- rbind(classification.results, temp.row)
+rm(temp.row, rf.fit)
+
+write.csv(classification.results, file = "~/Dropbox/Work-Research/Current Directory/Chores/Documents/022916/table9-classification-activityLevel.csv", row.names = F)
+
+
